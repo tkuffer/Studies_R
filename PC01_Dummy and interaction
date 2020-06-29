@@ -3,7 +3,7 @@ library(lmtest)
 library(haven)
 
 #load data set
-data=read_dta("C:\\Users\\HuberMar\\Dropbox\\Vorlesungen\\Applied Econometrics\\lecture\\lecture 1\\classize.dta")
+data=read_dta("C:/Users/kuffe/OneDrive/Formation/UniFR/3.2_Applied Econometrics/R/Data/classize.dta")
 
 #store variables in own objects
 attach(data)
