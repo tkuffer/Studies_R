@@ -1,3 +1,5 @@
+##AIM of the code is to understand the interaction between languages with the employement rate of asylum seekers in Switzerland 
+
 rm(list=ls())
 
 #libraries
