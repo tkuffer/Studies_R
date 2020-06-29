@@ -1,0 +1,184 @@
+Rcode
+
+#load libraries
+library(boot)
+library(sandwich)
+library(lmtest)
+library(qte)
+library(foreign)
+library(multiwayvcov)
+library(rdrobust)
+
+##################
+##Exercices 1 to 3
+
+rm(list=ls( ))
+load ("RDDbirthday.RData")
+head(data)
+attach(data)
+
+#Discontinuity plot
+rdplot(y = mom_educ, x = R, binselect = "es",  title = "Year of schooling", y.label = "Number of year", x.label = "Day prior to school entry date")
+
+#Exercice 1
+
+RDD1=lm(mom_educ~R+post)
+coeftest(RDD1,vcov. = vcovHC)
+
+#Exercice 2 
+
+RDD2=lm(mom_educ~R+post+R*post)
+coeftest(RDD2, vcov=vcovHC)
+
+#Exercice 3
+R2=R^2
+RDD3=lm(mom_educ~R+post+R*post+R2+R2*post)
+coeftest(RDD3, vcov=vcovHC)
+
+#Fitted values
+par(mfrow=c(1,3))
+plot(R,RDD1$fitted.values)
+plot(R,RDD2$fitted.values)
+plot(R,RDD3$fitted.values)
+
+#####################
+##Exercices 16 and 17
+
+rm(list=ls( ))
+load('votingbombing.RData')
+head(data)
+data=data[ (data$year==2000 | data$year==2004), ]
+attach(data)
+
+#Exercice 16
+ratio=pp/psoe
+post <- ifelse(year=="2004", 1,0)
+DID16=lm(ratio~dtreat+post+dtreat*post, data=data)
+coeftest(DID16, vcov=vcovHC)
+
+DID162=lm(ratio~dtreat+post+dtreat*post+voters, data=data)
+coeftest(DID162, vcov=vcovHC)
+
+#Exercice 17
+
+ClusterRobustvcov= cluster.vcov(DID162,id)
+coeftest(DID162,vcov=ClusterRobustvcov)
+Exercise 1 to 3 Plot
+ 
+Exercise 1
+“Run a linear RDD estimation to evaluate the effect of being born prior to the age cut-off on mother's years of schooling. Use the total sample and assume that the regression function of the outcome (“mom_educ”) given the running variable “R” has the same slope on both sides of the cut-off defined by the school entry date. Compute heteroskedasticity robust standard errors. Comment on the results ".
+Results
+
+> RDD1=lm(mom_educ~R+post)
+> coeftest(RDD1,vcov. = vcovHC)
+
+t test of coefficients:
+
+               Estimate  Std. Error  t value  Pr(>|t|)    
+(Intercept) 11.06003152  0.02408350 459.2370 < 2.2e-16 ***
+R           -0.00022328  0.00020911  -1.0678    0.2856    
+post        -0.22450176  0.04358140  -5.1513 2.611e-07 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Commentary 
+By assuming a linear function with the same slope on both sides of the threshold, being born after the school entry date reduce the number of schooling year by 0,22 years. This result is statistically significant at 0.1% level
+Exercise 2
+ 2) Run a linear RDD estimation using the total sample, with possibly different slopes of the regression function of “mom_educ” given “R” on both sides of the cut-off. Comment on the results.
+Results
+> RDD2=lm(mom_educ~R+post+R*post)
+> coeftest(RDD2, vcov=vcovHC)
+
+t test of coefficients:
+
+               Estimate  Std. Error  t value  Pr(>|t|)    
+(Intercept)  1.1060e+01  2.9797e-02 371.1755 < 2.2e-16 ***
+R           -2.2625e-04  2.8439e-04  -0.7956    0.4263    
+post        -2.2454e-01  4.3665e-02  -5.1424 2.738e-07 ***
+R:post       6.5542e-06  4.1961e-04   0.0156    0.9875    
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+ Commentary
+By assuming a linear function but by allowing different slopes on both sides of the threshold, being born after the school entry date reduce the number of schooling year by 0,22 years. This result is statistically significant at 0.1% level. The results are similar to the ones with the precedent result meaning that there is same difference across number of days before and days after the school entry date. 
+Exercise 3
+Run a quadratic RDD estimation using the total sample, with possibly different slopes of the regression function of “mom_educ” given “R” on both sides of the cut-off. Comment on the result
+Results
+> R2=R^2
+> RDD3=lm(mom_educ~R+post+R*post+R2+R2*post)
+> coeftest(RDD3, vcov=vcovHC)
+
+t test of coefficients:
+
+               Estimate  Std. Error  t value  Pr(>|t|)    
+(Intercept)  1.1065e+01  4.5080e-02 245.4624 < 2.2e-16 ***
+R           -4.5434e-05  1.1505e-03  -0.0395  0.968499    
+post        -2.0519e-01  6.5040e-02  -3.1548  0.001609 ** 
+R2           9.8367e-07  6.1559e-06   0.1598  0.873046    
+R:post      -1.0139e-03  1.6727e-03  -0.6061  0.544454    
+post:R2      3.6624e-06  8.9920e-06   0.4073  0.683793    
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Commentary
+By running a quadratic RDD estimation and by allowing different slopes on both sides of the threshold, being born after the school entry date reduce the number of schooling year by 0,20 years. This result is statistically significant at 1% level. The results show a lower effect of the treatment. The results seem more accurate with respect to the first plot graphic above. 
+
+Fitted values
+ 
+In the two first graphics, the linear regressions are the same. Allowing different trend on both side of the threshold does not seem to change the results. Although the quadratic RDD captures some differences on both side.
+
+Exercise 16
+Perform a DiD estimation to evaluate the effect of the Madrid bombings on the ratio of votes for conservatives vs. social democrats controlling for the number of voters in the region. (Hint: 2000 is the last pre-treatment period, 2004 is the post-treatment period). Report heteroskedasticity robust standard errors.
+Results
+> #Exercice 16
+> ratio=pp/psoe
+> post <- ifelse(year=="2004", 1,0)
+> DID16=lm(ratio~dtreat+post+dtreat*post, data=data)
+> coeftest(DID16, vcov=vcovHC)
+
+t test of coefficients:
+
+             Estimate Std. Error t value  Pr(>|t|)    
+(Intercept)  0.938681   0.073766 12.7251 < 2.2e-16 ***
+dtreat       0.560882   0.104393  5.3728 2.069e-07 ***
+post         0.112514   0.096184  1.1698    0.2434    
+dtreat:post -0.604626   0.129897 -4.6546 5.776e-06 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+> DID162=lm(ratio~dtreat+post+dtreat*post+voters, data=data)
+> coeftest(DID162, vcov=vcovHC)
+
+t test of coefficients:
+
+               Estimate  Std. Error t value  Pr(>|t|)    
+(Intercept)  9.3897e-01  7.3780e-02 12.7266 < 2.2e-16 ***
+dtreat       5.7099e-01  1.0536e-01  5.4196 1.654e-07 ***
+post         1.1257e-01  9.6204e-02  1.1701    0.2433    
+voters      -8.1005e-09  5.1889e-09 -1.5611    0.1200    
+dtreat:post -6.0450e-01  1.2981e-01 -4.6567 5.739e-06 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Commentary
+Running a DiD estimation to evaluate the effect of the Madrid bombings on the ratio of votes for conservatives vs. social democrats controlling for the number of voters in the region, the treatment influences negatively the relative vote of treated regarding towards conservatives. The results are significative at 0.1% level.
+By comparing people impacted by the bombing attack with Spanish living abroad, we can identify the move to a new political choice due to the attacks. The bombing attack is responsible to a negative impact on the ratio PP/PSOE. The conservative party, who claim that ETA is responsible for the attacks, is sanctioned in the elections by the Spanish living in the country.
+
+Exercise 17
+Estimate clustered standard errors (clustered on the regional level) using multiwayvcov package in R. How does clustering affect inference? 
+Results
+> ClusterRobustvcov= cluster.vcov(DID162,id)
+> coeftest(DID162,vcov=ClusterRobustvcov)
+
+t test of coefficients:
+
+               Estimate  Std. Error  t value  Pr(>|t|)    
+(Intercept)  9.3897e-01  7.3813e-02  12.7208 < 2.2e-16 ***
+dtreat       5.7099e-01  6.4562e-02   8.8440 4.087e-16 ***
+post         1.1257e-01  3.0481e-02   3.6931 0.0002835 ***
+voters      -8.1005e-09  4.4156e-09  -1.8345 0.0680101 .  
+dtreat:post -6.0450e-01  4.1315e-02 -14.6316 < 2.2e-16 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Commentary
+Taking into account the possible correlation over time at the region level and therefore controlling by cluster, the results have a reduced standard error which gain in significances. Although the results were already strongly significant before.  
