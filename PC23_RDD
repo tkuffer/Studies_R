@@ -1,0 +1,172 @@
+Remove previous data from memory
+rm(list=ls())
+
+load( "pc_3.RData" )
+ls()
+attach( data )
+
+##Descriptive statistics
+
+dim( data )
+
+summary( data )
+sum( is.na( data ) )
+ 
+#2. Obtain summary statistics on numvisits, mom_educ, and the number of days since mother’s birth before or after the age cut-off (R). Show distributions.
+summary(numvisits)
+hist(numvisits)
+
+summary(mom_educ)
+hist(mom_educ)
+ 
+summary(R)
+hist(R, breaks=40)
+ 
+#The plot shows that births are smoothly distributed throughout the year. There are slightly more births in the half of the year that precedes December 1.
+
+#3. Show how mean mom_educ and numvisits varies with levels of R (two separate plots). Comment on the graphs.
+
+#We observe a clear discontinuity in the relationship between R and mean education.  To estimate the relationship between the relative date of birth and education attainment, we could use the sharp RDD and account for the discontinuity in this relationship at the cut-off date.
+
+plot(aggregate(mom_educ,list(R=R),mean),ylab="mean_mom_educ",main="Mean education levels by R")
+ 
+#The relationship between R and prenatal care as measured by the number of doctor visits during pregnancy: No clear discontinuity is visible.
+sum(is.na(numvisits)) # sum missing values for numvisits
+
+plot(aggregate(numvisits,list(R=R),mean,na.rm=TRUE),ylab="mean_numvisits",main="Mean of doctor visits by R")
+ 
+#5. Assuming a constant slope before and after the discontinuity, estimate the effect of being born prior to/post the cut-off date on mother’s education. Comment on the obtained coefficients.
+ols1  = lm( mom_educ ~ z + R )
+summary( ols1 )
+
+#The idea of RDD is to capture a causal effect by distinguishing the discontinuous function (by introducing Zi) from the smooth function f(Ri).  The coefficient on Z gives the effect of being born before the cut-off date on education as compared to being born after the cut-off date ⟹ treatment effect at the cut-off.  The estimated model suggests that if a woman was born just before December 1, she stays at school, on average, 0.2 years longer as compared to the one born just after the cut-off date.
+The coefficient on R shows by how much the years of schooling change on average if the relative date of birth increases by 1 day.  It approximates the association between R and education linearly. 
+As the relative date of birth increases by one day, it is associated with an increase in the years of schooling of 0.0004691 years. 
+Both coefficients are statistically significant. 
+However, the effect is causal for Z only (as Z is randomly assigned). 
+The effect of R has no causal interpretation.
+6. Now estimate the same relationsh ip as in (5) but allow for different slopes before and after the discontinuity. What is the relation between R and education for women born prior to the cut-off date? And for those born after the cut-off date?
+Factor crossing within the model using the * operator: z * R=z+R+z:R, i.e. 3 variables are included in the model: (i) z, (ii) R, and (iii) the interaction of z and R.
+ols2 = lm( mom_educ ~ z * R )
+summary( ols2 )
+
+Estimated regression equation: 
+Yi=α+β1Zi+β2Ri+β3ZiRi+ui, 
+where Yi stands for mom.educ.
+We are interested in how the outcome variable changes on average with a change in the treatment status. 
+The treatment variable Zi is binary, its partial effect on Yi is computed as: 
+E[Yi∣∣Ri,Zi=1]−E[Yi∣∣Ri,Zi=0]=β1+β3Ri.
+At the cut-off point Ri=0. 
+Thus, β1 captures the effect of the cut-off on mean education. 
+The effect of being born just before the cut-off date is 0.2 additional years of education (as compared to those who were born right after the cut-off date). 
+To see how the outcome variable changes on average with a one-day change in the relative date of birth (R), we take the partial derivative of Y w.r.t. R: 
+∂Yi∂Ri=β2+β3Zi.
+The total effect depends on the value of Zi which takes values of 0 or 1, depending on if a woman was born before or after the cut-off.
+Before, Zi=1:∂Yi∂Ri=β2+β3. 
+After, Zi=0:∂Yi∂Ri=β2.
+For women born before the cut-off, a one-day change in the relative date of birth is associated on average c.p. with β2+β3 =0.000488−0.000038 =0.00045 more years of schooling (or about 3.9 more hours). 
+For women born after the cut-off date, a one-day change in the relative date of birth is associated on average c.p. with 0.000488 more years of schooling (or about 4.3 hours). 
+The interaction term is not statistically significantly different from zero ⟹ the difference in the slopes before/after the cut-off is not significant.
+7. Add race/ethnicity variables to your previous estimation. How can these control variables help to improve the regression specification? Interpret the results.
+Check if there is no perfect linear dependence between the constant and the variables on ethnicity
+sum(rbind(mean(black),mean(white_nh),mean(white_h)))
+0.959140792481224 
+OLS estimation
+ols3 = lm( mom_educ ~ z * R + black + white_nh + white_h )
+summary( ols3 )
+
+This exercise can be thought of as a robustness check. 
+Our coefficient of interest is left almost unchanged (considering magnitude and significance). 
+This suggests no correlation between the included control variables and the regressor of interest Z. 
+Looking at the covariates, two of them are positively associated with the years of education. 
+Being an African American (black) is associated with 0.1 additional years of education as compared to the reference race, being a Caucasian (white_nh) is associated with 0.3 additional years of education, and being a Hispanic (white_h) is associated with 0.2 fewer years of education.
+8. Focus on a narrower neighbourhood around the discontinuity. Only consider observations within 40 days around the cut-off. Estimate again the effect of being born prior to/post the cut-off date on mother’s education, allowing for different slopes before and after the discontinuity. Do not include controls. Comment on the obtained coefficients.
+Focussing on a narrower neighbourhood can help to decrease bias caused by misspecification of the functional form. 
+If we consider all the observations, including those far away from the cut-off, we are likely to end up with some degree of misspecification. 
+If we only consider a sub-sample around the cut-off, we get a better fit of the regression line ⟹ lower bias (but higher standard errors).
+Vector with locigal values: 1 if R∈[−39,40], otherwise 0
+
+localsample = ( R >= -39 & R <= 40 )
+Sample size of observations with R∈[−39,40]
+sum(localsample)
+ 
+ols4 = lm( mom_educ[ localsample == 1 ] ~ z[ localsample == 1 ] * R[ localsample == 1 ] ) 
+summary( ols4 )
+
+The effect of being born just before the cut-off date is, on average, 0.16 additional years of education (as compared to those who were born right after the cut-off date).
+
+9. Show graphically the relationship between predicted mother’s education (obtained from the regression of mother’s education on dummies defined by the running variable) and relative date of birth (i.e. running variable R).
+The function factor generates different categories for each of the 80 values of R
+ols_factorized_R = lm( mom_educ[ localsample == 1 ] ~ factor( R[ localsample == 1 ] ) )
+ols_factorized_R # model with intercepts only, factors can be regarded as dummies
+
+Plotting fitted values of education (conditional mean outcomes) by R within 40 days around the cut-off
+This graph is similar to the one in the descriptive part presented in task (3). 
+However, here we consider only the local sample (only those born 40 days before/after the cut-off date) 
+The values shown are predicted values rather than observed ones. 
+A clear discontinuity can be observed again.
+plot( y = ols_factorized_R $ fitted, x = R[ localsample == 1 ] )
+ 
+Suppose the treatment variable education is binary: high vs. low education. We are interested in estimating the effect of high education on new-born’s health within the framework of fuzzy RDD.
+
+We estimate: 
+
+numvisits=β0+β11(education>9)+β2R+u. 
+As discussed in (1), a simple regression of numvisits on education is likely to generate an endogeneity problem. 
+We can use the fuzzy RDD design to exploit the exogenous part of the variation in the indicator for mother’s high education to estimate its effect on prenatal care. 
+An exogenous part of variation in the indicator for mother’s high education arises from the discontinuity in the average years of education. 
+Fuzzy RDD: Treatment probability (here: probability of getting high education) changes discontinuously at the threshold.
+10. Generate a binary treatment variable, indicating high mother’s education (= more than 9 years).
+The relationship between the relative date of birth and the probability of having more than 9 years of education are related discontinuously. 
+With the fuzzy RDD, we instrument the probability of having high education by the indicator of being born before/after the cut-off date (at the first stage). 
+Then we estimate the effect of having high education (predicted from the first-stage) on prenatal care.
+higheduc = mom_educ > 9
+11. Assuming a constant slope before and after the discontinuity, conduct the first stage estimation of the effect of being born prior to/after the cut-off date on the probability to have high education. Comment on the obtained coefficients.
+Plotting the treatment probability by the forcing variable R gives information on the first stage
+plot( aggregate( higheduc, list( R = R ), mean ),ylab = "probability of high educ" )
+ 
+First stage effect of instrument z on treatment higheduc
+ols5 = lm( higheduc ~ z + R )
+summary( ols5 )
+
+12. Conduct a fuzzy RDD for estimating the effect of high education on prenatal care (measured as the number of doctor visits prior to birth), while instrumenting high education. Assume a constant slope of the running variable before/after the cut-off. Comment on the obtained coefficients.
+iv1 = ivreg( numvisits ~ higheduc + R | z + R )
+summary( iv1 )
+
+Women with high education have on average, c.p., 2.24 more doctor visits than women with less than 9 years of education. 
+The effect is statistically significantly different from zero at the 5% significance level.
+
+13. Repeat your estimation in (12), but allow for different slopes in the running variable. Interpret the obtained coefficients.
+iv2 = ivreg( numvisits ~ higheduc * R | z * R )
+summary( iv2 )
+
+Women with high education have on average, c.p., 0.92 more doctor visits than women with less than 9 years of education. 
+However, this estimate is not statistically significant at any conventional level of significance.
+The estimation accounts for different slopes in the relationship between the relative date of birth and the number of doctor visits for women with versus without high education. 
+However, the effect of a day change in the relative date of birth on doctor visits is not significant for either.
+If the slope had been significant: 
+For those without high education: one-day change in the relative date of birth is associated with 0.11732 fewer doctor visits. 
+For those with high education: a one-day increase in the relative date of birth is associated with −0.11732+0.12794=0.01062 more doctor visits. 
+
+14. Add race/ethnicity controls to your previous estimation.
+iv3 = ivreg( numvisits ~ higheduc * R + black + white_nh + white_h | z * R + black + white_nh + white_h )
+summary( iv3 )
+
+Adding ethnicity controls has no relevant impact on our effect of interest (considering magnitude and statistical significance). 
+However, the coefficients on ethnicity are statistically significantly different from zero, suggesting positive association between ethnicities and the number of doctor visits (as compared to the baseline ethnic category).
+15. Focus again on the observations within 40 days around the cut-off. Investigate the first stage again, assuming a constant slope of the running variable before/after the cut-off. Compare the obtained coefficients with those obtained from (11).
+ols6 = lm( higheduc[ localsample == 1 ] ~ z[ localsample == 1 ] + R[ localsample == 1 ] )
+summary( ols6 )
+
+For women born right before the cut-off, the probability of having high education is on average, c.p., 2.2 percentage points higher as compared to those who are born right after the cut-off (estimate is 0.022217).
+
+16. Still focusing on the observations within 40 days around the cut-off, use a fuzzy RDD to estimate the effect of high education on prenatal care. Allow for different slopes in the running variable left and right of the cut-off and do not include additional covariates. Comment on the results and compare them to (13).
+iv4 = ivreg( numvisits[ localsample == 1 ] ~ higheduc[ localsample == 1 ] * R[ localsample == 1]
+            | z[ localsample == 1 ] * R[ localsample == 1 ] )
+summary( iv4 )
+
+This estimation is similar to the one from (13), but it is run for the local sample. 
+Women with high education are estimated to have on average, c.p., 0.5 fewer doctor visits than women with less than 9 years of education (result not statistically significant at any conventional level). 
+The estimation accounts for different slopes in the relationship between the relative date of birth and number of visits for women with versus. without high education: 
+For those without high education: a day change in the relative date of birth is associated with 0.06 more doctor visits during pregnancy. For those with high education: a day change in the relative date of birth is associated with 0.06141−0.06892=−0.00751 fewer doctor visits during pregnancy. 
+However, none of these estimates are statistically significant.
