@@ -1,0 +1,201 @@
+PC LAB 1
+
+Exercise 1
+
+Briefly describe the data: How many individuals received the treatment? What are the shares of females and males in the sample? What is the average age?
+We have 1120 observations of Italians. 229 have been temporarily employed and are defined has the Treatment group. Descriptions are in the table below (Exercise 2).
+R Code :
+install.packages("readstata13")
+install.packages("Matching")
+library(readstata13)
+library(Matching)
+data1 = read.dta13("Ichino et al.dta")
+summary(data1)
+head(data1)
+dim(data1)
+
+###############
+#  Ex 1.      #
+###############
+sum(data1$treat)
+#229 individuals are treated (Temporary employed)
+
+#part of male
+table(data1$male)
+nbmale=table(data1$male)[2]/(table(data1$male)[1]+table(data1$male)[2])
+mean(data1$male)
+nbmale
+#part of female
+nbfemale = 1-nbmale
+nbfemale
+
+#average age
+mean(data1$age)
+Calculation results
+> sum(data1$treat)
+[1] 229
+> #part of male
+> table(data1$male)
+
+  0   1 
+709 411 
+> nbmale=table(data1$male)[2]/(table(data1$male)[1]+table(data1$male)[2])
+> mean(data1$male)
+[1] 0.3669643
+> nbmale
+        1 
+0.3669643 
+> #part of female
+> nbfemale = 1-nbmale
+> nbfemale
+        1 
+0.6330357 
+> #average age
+> mean(data1$age)
+[1] 29.36964
+Exercise 2
+Are the means of the variables gender ("male"), age ("age"), and education ("edu0", "edu1", "edu2"), which probably affect labor market success, significantly different across treatment states? 
+As we can see in the descriptive statistic table below, the share of males is significantly higher in the treatment group than in the whole sample. We can mention that the treatment group has lower well-educated people than the non-treated but higher share of medium educated people. This has no impact on the results as we are doing matching and comparing pairs based on common characteristics. It could be an issue if they are that different than the common support is too small to be significant.
+Descriptive statistic
+	SAMPLE	TREATED	NON-TREATED
+Male	37%	67%	29%
+Female	63%	23%	71%
+Age	29.36 years	26.78 years	30.03 years
+Education lower than high school (edu0)		28%	36%
+High school education 		65%	52%
+College or university 		7%	13%
+Code R
+###############
+#  Ex 2.      #
+###############
+#average age across treatement state
+tapply(data1$age, data1$treat, mean)
+
+#part of male across treatement state
+tapply(data1$male, data1$treat, mean)
+
+#part of low educated across treatement state
+tapply(data1$edu0, data1$treat, mean)
+
+#part of medium educated across treatement state
+tapply(data1$edu1, data1$treat, mean)
+
+#part of high educated across treatement state
+tapply(data1$edu2, data1$treat, mean)
+
+Calculation results
+> #average age across treatement state
+> tapply(data1$age, data1$treat, mean)
+       0        1 
+30.03479 26.78166 
+> #part of male across treatement state
+> tapply(data1$male, data1$treat, mean)
+        0         1 
+0.2884400 0.6724891 
+> #part of low educated across treatement state
+> tapply(data1$edu0, data1$treat, mean)
+        0         1 
+0.3580247 0.2751092 
+> #part of medium educated across treatement state
+> tapply(data1$edu1, data1$treat, mean)
+        0         1 
+0.5162738 0.6506550 
+> #part of high educated across treatement state
+> tapply(data1$edu2, data1$treat, mean)
+         0          1 
+0.12570146 0.07423581 
+Exercise 3
+Use direct pair matching on the variables gender ("male"), age ("age"), and education ("edu1", "edu2") to estimate the ATET. Apply Mahalanobis distance in matching with replacement and bias correction. 
+Summary
+Estimate...  0.28345 
+AI SE......  0.044136 
+T-stat.....  6.4222 
+p.val......  1.3435e-10 
+
+Original number of observations..............  1120 
+Original number of treated obs...............  229 
+Matched number of observations...............  229 
+Matched number of observations  (unweighted).  1992 
+Interpretation
+ATET = 0.2835
+The treatment effect on the treated is 0.2835 which means that the treated has a probability of having a job on time 3 which is 28.3 percentage point bigger than for the non-treated.
+The p-value is extremely low (1.3435e-10), the result is statistically significant at a 0.1% level.
+Code R
+###############
+#  Ex 3.      #
+###############
+attach(data1)
+x <- cbind(male,age,edu1,edu2)
+y <- out3
+tr <- treat
+r1 = Match(Y=y,X=x,Tr=tr,weight=2, estimand = 'ATT', M=1, BiasAdjust = TRUE, replace=TRUE)
+r1$est
+summary(r1)
+Calculation results
+> x <- cbind(male,age,edu1,edu2)
+> y <- out3
+> tr <- treat
+> r1 = Match(Y=y,X=x,Tr=tr, estimand = 'ATT', M=1, BiasAdjust = TRUE, replace=TRUE)
+> r1$est
+          [,1]
+[1,] 0.2834497
+Exercise 4
+Estimate the ATET using 1:2 matching.
+Summary 
+Estimate...  0.27242 
+AI SE......  0.044145 
+T-stat.....  6.171 
+p.val......  6.7875e-10 
+
+Original number of observations..............  1120 
+Original number of treated obs...............  229 
+Matched number of observations...............  229 
+Matched number of observations  (unweighted).  2067 
+Interpretation 
+The 1:2 matching for ATET is done with the 2 closest observations on the reference observation. The M matching is made by looking at the 2 closest non-treated observations to the treated one, which allows 2067 matched number of observations against 1992 in direct Matching.
+ATET = 0.27242
+The treatment effect on the treated is 0.27242 which means that the treated has a probability of having a job on time 3 which is 27.242 percentage point bigger than for the non-treated.
+The p-value is extremely low (6.7875e-10), the result is statistically significant at a 0.1% level. 
+R code
+###############
+#  Ex 4.      #
+###############
+r2 = Match(Y=y,X=x,Tr=tr, estimand = 'ATT', M=2, BiasAdjust = TRUE, replace=TRUE)
+r2$est
+Calculation results
+> r2 = Match(Y=y,X=x,Tr=tr, estimand = 'ATT', M=2, BiasAdjust = TRUE, replace=TRUE)
+> r2$est
+          [,1]
+[1,] 0.2724159
+Exercise 5
+Estimate the ATET using 1:5 matching. Compare the results to (4).
+Summary 
+Estimate...  0.28011 
+AI SE......  0.041586 
+T-stat.....  6.7355 
+p.val......  1.6331e-11 
+
+Original number of observations..............  1120 
+Original number of treated obs...............  229 
+Matched number of observations...............  229 
+Matched number of observations  (unweighted).  2388 
+
+Interpretation
+The 1:5 matching for ATET is done with the 5 closest observations on the reference observation. The M matching is made by looking at the 5 closest non-treated observations to the treated one, which allows 2388 matched number of observations against 1992 in direct Matching.
+ATET = 0.28011
+The treatment effect on the treated is 0.28011 which means that the treated has a probability of having a job on time 3 which is 28.011 percentage point bigger than for the non-treated.
+By looking at the M=5 values, we are getting a 0.769 percentage point higher probability to get a job on period 3 than with M=2. The matching corrected standard error varies as little as -0.00256. The p-value is more than ten times lower as it relies on more matches. 
+The differences between M=2 and M=5 are rather small. We see a relatively higher effect of the treatment in M=5. The standard error and p value are good in both cases even if we notice relatively lower standard error and p-value in M=5. 
+R code
+###############
+#  Ex 5.      #
+###############
+r5 = Match(Y=y,X=x,Tr=tr, estimand = 'ATT', M=5, BiasAdjust = TRUE, replace=TRUE)
+r5$est
+
+Calculation results
+> r5 = Match(Y=y,X=x,Tr=tr, estimand = 'ATT', M=5, BiasAdjust = TRUE, replace=TRUE)
+> r5$est
+          [,1]
+[1,] 0.2801053
+
