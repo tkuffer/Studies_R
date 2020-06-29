@@ -1,0 +1,169 @@
+library(haven)#data in another format
+library(sandwich)#robust covariance estimators
+library(lmtest)#linear models
+library(mfx)# marginal effects
+
+# load data set
+data=read_dta("C:/Users/kuffe/OneDrive/Formation/UniFR/3.2_Applied Econometrics/R/Data/PNTSPRD_2018.DTA")
+# store variables in own objects
+attach(data)
+
+# Define model 
+model=favwin ~ spread
+
+# EX1. Explain why, if the  incorporates all relevant information, we expect  = 0.5. 
+#The constant is the expected value of the dependent variable if all regressors are equal to zero. So if spread is zero, there is no favorite, and the probability that the team we (arbitrarily) label the favorite should have a 50% chance of winning. 
+
+# Ex.2 Estimate OLS model
+# two-sided test with usual standard errors
+ols1=lm(model)
+summary(ols1)
+#tval=(ols1$coeff[1]-0.5)/summary(ols1)$coeff[1,2]
+#pval = 2*pt(abs(tval), nrow(data) - 2,lower.tail = FALSE)
+
+#tval
+#pval
+
+# two-sided test with robust standard errors
+coeftest(ols1,vcov = vcovHC)
+#tval2=(ols1$coeff[1]-0.5)/coeftest(ols1,vcov = vcovHC)[1,2]
+#pval2 = 2*pt(tval2, df=nrow(data) - 2,lower.tail = FALSE)
+
+#tval2
+#pval2
+
+#The  is rejected at the 1% significance level for the usual standard errors and the 1% significance level for the heteroskedasticity robust standard errors
+
+# Ex.3 Spread=10
+ols1$coeff[1]+coeftest(ols1,vcov = vcovHC)[2]*10
+# Propability > 1 for spread=50
+ols1$coeff[1]+coeftest(ols1,vcov = vcovHC)[2]*50
+
+#As we expect, spread is very statistically significant using either standard error, with a t-statistic greater than eight. 
+#If spread = 10 the estimated probability that the favored team wins is 0.5733544+ 0.0195139*10 = 0.7684932. 
+
+# Ex.4 Logit model
+##0 or 1 variable so binomial 
+logit1=glm(model, family=binomial(logit))
+summary(logit1)
+#With a p-value of 0.62 the null hypothesis that the intercept is zero cannot be rejected
+
+# Ex.5 Logit for spread=10
+## transforme the outcome with exp to make it comparable
+## exp(1.54941)/[1+exp(1.54941)]
+exp(logit1$coeff[1]+logit1$coeff[2]*10)/(1+exp(logit1$coeff[1]+logit1$coeff[2]*10))
+# Spread=50
+exp(logit1$coeff[1]+logit1$coeff[2]*50)/(1+exp(logit1$coeff[1]+logit1$coeff[2]*50))
+
+#This is somewhat higher than the OLS estimate because it is outside the region where the probability is well approximated by the linear model (0.3-0.7). Note that we obtain a probability that is close to one but never larger than one if we set spread = 50. 
+ 
+
+data2=read_dta("C:/Users/kuffe/OneDrive/Formation/UniFR/3.2_Applied Econometrics/R/Data/loanapp.dta")
+
+
+attach(data2)
+
+# Ex.6 Summary statistics for approve
+summary(approve)
+mean(approve)
+##E(approve)=0*Pr(approve=0)+1*Pr(approve=1)=0.8773
+#Note that E(approve) = 0*Pr(approve = 0)+1*Pr(approve = 1) = Pr(approve = 1). Hence, the unconditional probability that a loan will be approved in the sample is equal to the sample mean of approve: 0.8773253 or 87.7%. 
+ 
+
+
+# Ex.7 
+# OLS
+ols2=glm(formula = approve ~ 1, family = binomial(logit)) 
+coeftest(ols2,vcov = vcovHC)
+
+#When estimating logit, we have to do the transformation to obtain the predicted probability which then also equals the mean of the dependent variable: 
+ (1.967342) = exp(1.967342)/[1 + exp(1.967342)] = 0.8773253. 
+
+# Logit
+logit2=glm(approve~1, family=binomial(logit)) ## classify family to be binomial with logit
+summary(logit2)
+exp(logit2$coeff[1])/(1+exp(logit2$coeff[1])) ## transform exp(intercet)/exp(coef)
+##same result with OLS and logit because regressed on a constant with binomial
+
+# Ex.8 Mean approval rates for white and non-white
+mean1=mean(approve[white==1])
+mean2=mean(approve[white==0])
+
+mean1
+mean2
+
+# Ex.9 Logit model for approve on const and white
+logit3=glm(approve~white, family=binomial(logit))
+summary(logit3)
+# non-white
+exp(logit3$coeff[1])/(1+exp(logit3$coeff[1]))
+# white
+exp(logit3$coeff[1]+logit3$coeff[2])/(1+exp(logit3$coeff[1]+logit3$coeff[2]))
+
+# Compare with OLS
+ols3=lm(approve~white)
+coeftest(ols3,vcov = vcovHC)
+# non-white
+coeftest(ols3,vcov = vcovHC)[1]
+#white
+coeftest(ols3,vcov = vcovHC)[1]+coeftest(ols3,vcov = vcovHC)[2]
+
+#As there is only one explanatory variable that takes on just two values, there are only two different predicted values: the estimated probabilities of loan approval for white and non-white applicants. These are 0.7077922 for non-whites and 0.9083879 for whites. Without rounding errors, these are identical to the fitted values from the linear probability model. This must always be the case when the independent variables in a binary response model are mutually exclusive and exhaustive binary variables. Then, the predicted probabilities, whether we use the LPM, probit, or logit models, are simply the cell frequencies. (In other words, 0.7077922 is the proportion of loans approved for non-whites and 0.9083879 is the proportion approved for whites) 
+ 
+
+# Ex.10 Estimate OLS, logit and probit with added variables
+#a)
+model2=approve~white+hrat+obrat+loanprc+unem+male+
+  married+dep+sch+cosign+chist+pubrec+mortlat1+mortlat2+vr
+
+# OLS
+ols4=lm(model2)
+coeftest(ols4,vcov = vcovHC)
+
+# Logit
+logit4=glm(model2, family=binomial(logit))
+summary(logit4)
+
+# Probit
+probit1=glm(model2, family=binomial(probit))
+summary(probit1)
+
+
+#b) marginal effects at means of other regressors
+#Probit
+probitmfx(formula=model2, data=data, atmean=TRUE)
+
+#Logit
+logitmfx(model2, data=data, atmean=TRUE)
+
+#c) average marginal effects
+#Probit
+probitmfx(model2, data=data, atmean=FALSE)
+
+#Logit
+logitmfx(model2, data=data, atmean=FALSE)
+
+#11
+##to show e(y)=pr(y=1)
+##e(y)=1*pr(y=1)+0*Pr(y=0) = pr(y=1)
+
+#12
+##problems in OLS if the dependent varaible is binary
+#-> we can get estimates above 100% or below 0%
+# probit or logit
+#->estimated pro are between 0% and 100%
+#OLS does not allow for bounds below zero or above 1. Probit and logit make sure that the predicted probability is within zero and 1.
+#13
+#why do the coef in probit or logit do not directly give marginal effects as in OLS
+#-> ols : a linear model (marginal effect4 are constant)(marginal effect can be seen directly from the table)
+#probit logit
+#-> non linear model is not constant marginal effect is a function of X
+#In the nonlinear models, marginal effect is a function of X while in the OLS marginal is constant. 
+
+#14 OLS - E(u|X)=0
+#ML additionally we need to specify the distribution of the error terms.
+#F.ex in probit the distribution it is a normal distribution
+#For OLS only E(u|x)=0 needs to hold, but for ML models, you in addition need to specify the entire distribution of the error (e.g. normal distribution for probit)
+
+
+
