@@ -1,0 +1,126 @@
+PC LAB 4
+Rcode
+
+rm(list=c())
+library(causalweight)
+library(AER)
+
+
+###############
+# Load #
+###############
+
+load("CardIVdata.RData")
+attach(CardIVdata)
+summary(CardIVdata)
+
+
+###############
+# Ex.1        #
+###############
+
+CardIVdata$wdollars <- CardIVdata$wage / 100
+summary(CardIVdata$wage)
+summary(CardIVdata$wdollars)
+
+###############
+# Ex.2        #
+###############
+wdollars <- (CardIVdata$wdollars)
+Late = (mean(wdollars[nearc4==1])-mean(wdollars[nearc4==0]))/(mean(degree[nearc4==1])-mean(degree[nearc4==0]))
+summary(Late)
+Late
+
+###############
+# Ex.3        #
+###############
+
+summary(ivreg(wdollars ~ degree|nearc4),vcov = vcovHC)
+## we get the same results by running a two-stage least sqaures regression as the outcome (wage) is regressed on the treatement (having a degree) by using the instrumental variable (living near XXX)
+
+
+###############
+# Ex.4        #
+###############
+
+Control = cbind(age, black, smsa)
+
+summary(ivreg(wdollars ~ degree+Control|nearc4+Control),vcov = vcovHC)
+## the estimates are imprecise because the instruments are weak (except for the age control). IV estimates do suggest a lower effect.
+
+
+
+Exercise 1
+“1) The hourly wage variable in this dataset is given in cents. Create an outcome variable which corresponds to the hourly wage in dollars.".
+Results
+
+> RDD1=lm(mom_educ~R+post)
+> coeftest(RDD1,vcov. = vcovHC)
+
+t test of coefficients:
+
+               Estimate  Std. Error  t value  Pr(>|t|)    
+(Intercept) 11.06003152  0.02408350 459.2370 < 2.2e-16 ***
+R           -0.00022328  0.00020911  -1.0678    0.2856    
+post        -0.22450176  0.04358140  -5.1513 2.611e-07 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Commentary 
+By assuming a linear function with the same slope on both sides of the threshold, being born after the school entry date reduce the number of schooling year by 0,22 years. This result is statistically significant at 0.1% level
+Exercise 2
+ 2) Estimate the LATE of having a university degree on the hourly wage (in dollars) using an indicator for growing up near a 4-year college as an instrument for having a university degree. How do you interpret the estimated effect? (Hint: Use the formula for the unconditional LATE identification based on mean differences given in the lecture slides.).
+Results
+Commentary
+We are looking at the outcome from the compliers. We capture the effect on the hourly wage of the one who lived next to university and obtained a degree. Doing so, we exclude the impact of a non-observed variable which impact both the outcome and the treatment. The effect on the compliers is an increase of a hourly wage of USD 13.01. 
+Exercise 3
+Confirm your estimations using the 2SLS procedure from the AER package. Discuss the significance of the estimated treatment coefficient
+Results
+> R2=R^2
+> RDD3=lm(mom_educ~R+post+R*post+R2+R2*post)
+> coeftest(RDD3, vcov=vcovHC)
+
+t test of coefficients:
+
+               Estimate  Std. Error  t value  Pr(>|t|)    
+(Intercept)  1.1065e+01  4.5080e-02 245.4624 < 2.2e-16 ***
+R           -4.5434e-05  1.1505e-03  -0.0395  0.968499    
+post        -2.0519e-01  6.5040e-02  -3.1548  0.001609 ** 
+R2           9.8367e-07  6.1559e-06   0.1598  0.873046    
+R:post      -1.0139e-03  1.6727e-03  -0.6061  0.544454    
+post:R2      3.6624e-06  8.9920e-06   0.4073  0.683793    
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Commentary
+The results are similar and highly significative which tends to confirm LATE.
+Exercise 4
+Use 2SLS to conduct IV estimation controlling for variables “age”, “black” and “smsa”. Compare the estimated treatment effect to the result in (3).
+Results
+> Control = cbind(age, black, smsa)
+> summary(ivreg(wdollars ~ degree+Control|nearc4+Control),vcov = vcovHC)
+
+Call:
+ivreg(formula = wdollars ~ degree + Control | nearc4 + Control)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-12.929  -4.092   1.666   3.621  19.072 
+
+Coefficients:
+             Estimate Std. Error t value Pr(>|t|)    
+(Intercept)  -2.98330    1.28893  -2.315 0.020705 *  
+degree       12.24248    8.24997   1.484 0.137929    
+Controlage    0.18169    0.05155   3.524 0.000431 ***
+Controlblack  0.85706    1.62752   0.527 0.598510    
+Controlsmsa   0.17369    0.76946   0.226 0.821422    
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 5.424 on 3005 degrees of freedom
+Multiple R-Squared: -3.249,	Adjusted R-squared: -3.254 
+Wald test: 45.09 on 4 and 3005 DF,  p-value: < 2.2e-16 
+
+Commentary
+When we control by age the standard error increase highly and then we can not reject the null hypothesis that LATE is equal to 0.
+
