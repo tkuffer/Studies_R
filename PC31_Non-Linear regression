@@ -1,0 +1,149 @@
+
+rm(list=ls())
+
+data=read_dta("C:\\Users\\kuffe\\OneDrive\\Formation\\UniFR\\4.1_Econometrics Methods and Applications I\\R\\Code+Data\\pc_1.dta")
+
+Libraries
+# install.packages('package name', repos='http://cran.us.r-project.org') #install package
+library(foreign) # Work with foreign data format
+library(sandwich) # Standard errors robust to heteroskedasticity 
+library(lmtest) # OLS regression
+library(mfx) # GLM
+library(histogram) # Histograms
+library(descr) # Descriptive statistics: splitting, applying and combining data
+library(AER) # Applied Econometrics with R
+library(censReg) # For Tobit
+library(plyr) # Function ddply: Tools for splitting, applying and combining data
+library(memisc) # Management of Survey Data and Presentation of Analysis Results
+
+Data
+data_pc1 = data
+
+#Descriptive statistics
+#1. According to the description above and the data at hand, describe the outcome variable labor force participation. What does the conditional expectation E[lfp|child, X] represent in this case? Why is it problematic to estimate it with OLS?
+#The outcome is a binary variable indicating whether a woman works (=1) or not (=0).  Since lfp is a binary variable, the conditional expectation represents the probability of success, in this case it is the probability of being employed for women conditional on the number of children and further confounding factors: E[lfp|child,X]=P(lfp=1|child,X).  A probability is bounded between zero and one.  Using OLS, the estimated conditional probability of participation in the labor force can take values outside these bounds.
+
+summary( lfp )
+
+hist_lfp=hist(lfp,col="grey",main="Labor force participation")
+ 
+#2. What is the percentage of women employed?
+mean( lfp )
+summary( child )
+table( child )
+hist_child=hist(child,col="dimgray",main="Number of children")
+ 
+#How does the outcome variable (lfp) vary with the number of children?
+#For females, the probability of being employed decreases with the number of children. aggregate: Compute Summary Statistics of Data Subsets (help obtained by the ? operator: ?aggregate)
+
+aggregate(lfp,list(child=child),mean)
+
+plot(aggregate(lfp,list(child=child),mean))
+
+tapply(lfp,list(child=child),mean)
+
+ddply(data_pc1,"child",summarize,mean=mean(lfp),sd=sd(lfp),obs=length(lfp))
+
+plot(ddply(data_pc1,"child",summarize,mean_lfp=mean(lfp)))
+ 
+#What if we exclude those below 25 and above 66 years of age?
+ddply(data_pc1,"child",summarize,mean=mean(lfp[age<66&age>25]),sd=sd(lfp[age<66&age>25]),
+      obs=length(lfp[age<66&age>25]))
+
+#3. Obtain the distribution of age in the sample. Show also how the average age varies with lfp and with the number of children. Comment shortly on the tables.
+
+summary(age)
+  
+table( age )
+
+hist_age=hist(age,col="darkturquoise",main="Age")
+ 
+aggregate(age,list(lfp=lfp),mean)
+
+plot(aggregate(age,list(lfp=lfp),mean))
+ 
+ddply(data_pc1,"lfp",summarize,mean=mean(age),sd=sd(age),obs=length(age))
+
+plot(ddply(data_pc1,"lfp",summarize,mean=mean(age)))
+ 
+#Average age varying with the number of children using aggregate
+aggregate(age,list(child=child),mean)
+plot(aggregate(age,list(child=child),mean))
+ 
+#Average age varying with the number of children using ddply
+ddply(data_pc1,"child",summarize,mean=mean(age),sd=sd(age),obs=length(age))
+plot(ddply(data_pc1,"child",summarize,mean=mean(age)))
+ 
+#4. Now consider hours worked. Obtain its distribution and show how average hours worked differ by the number of children. Comment shortly on the tables.
+
+summary(hours)
+
+hist_hours=hist(hours,col="khaki1",main="Hours worked")
+ 
+#Average hours differing by the number of children
+ddply(data_pc1,"child",summarize,mean=mean(hours),sd=sd(hours),obs=length(hours))
+plot(ddply(data_pc1,"child",summarize,mean=mean(hours)))
+ 
+#Hours worked by the number of children only for those in labor force:
+ddply(data_pc1,"child",summarize,mean=mean(hours[lfp==1]),sd=sd(hours[lfp==1]),obs=length(hours[lfp==1]))
+
+#####Estimation: LPM, Probit, Tobit
+#Estimate the probability of labor force participation using a linear probability model (LPM).
+#5. What is the marginal effect of the number of children on lfp? Interpret the coefficient on child. Comment also on the coefficients of the dummy variables for the youngest child.
+#Generate the dummy variable married
+married=1*(civil==2)
+#Generate an object for a model that is applied to all estimations
+model_pc1 = lfp ~ child + ych0_2 + ych3_4 +  ych5_10 + ych11_16 + age + I(age^2) + educ_l + 
+            educ_h +married + nwinc
+Linear probability model (LPM)
+lpm = lm( model_pc1 )
+coeftest( lpm, vcov = vcovHC )
+
+#The number of children has on average a negative impact on women's probability to work, it decreases the probability by around 0.07, i.e. 7 percentage points for each additional category of child.  However, the age of the children has an important impact too: ych0_2 and ych11_16 are significant at the 10% level, whereas the other two estimates are not. For women with the youngest child between 0 and 2 years of age, the probability of working is on average about 8 percentage points lower compared to women who do not have the youngest child in that age.  Having older children (youngest child between 11 and 16) instead increases the probability of working on average by about 7 percentage points.
+
+#Table based on the library memisc
+mtable( lpm, digits = 3) # homoskedastic standard errors in round brackets
+
+##6. Compute the average effect on the probability to work for women with two children (youngest child between 0 and 2) compared to if they have only one child (aged between 0 and 2). Also obtain the mean effect on the probability to work for women with three children (youngest child between 0 and 2) compared to women with two children (youngest child between 0 and 2). Interpret the results shortly.
+P(lfp=1|child=2,ych0_2=1,X)−P(lfp=1|child=1,ych0_2=1,X) 
+
+mean1<-mean(cbind(1,1,1,ych3_4,ych5_10,ych11_16,age,I(age^2),educ_l,educ_h,married,nwinc)%*%lpm$coef)
+mean2<-mean(cbind(1,2,1,ych3_4,ych5_10,ych11_16,age,I(age^2),educ_l,educ_h,married,nwinc)%*%lpm$coef)
+mean2-mean1
+
+P(lfp=1|child=3,ych0_2=1,X)−P(lfp=1|child=2,ych0_2=1,X) 
+
+mean3<-mean(cbind(1,3,1,ych3_4,ych5_10,ych11_16,age,I(age^2),educ_l,educ_h,married,nwinc)%*%lpm$coef)
+mean3-mean2
+
+#The linear model yields constant partial effects (for variables measured in levels).
+
+##7. Compute the predicted probabilities of working. Are there any problems?
+Fitted values of linear probability model
+fv_lpm = fitted( lpm )
+
+hist_fv_lpm = hist(fv_lpm, col = "lightblue", main = "Fitted values LPM" )
+ 
+#The maximum and minimum of the distribution reveal predicted probabilities larger than 1 and smaller than 0 (negative).  However, these probabilities should be between 0 and 1.  Therefore, the linear model is not optimal in this case.
+
+##8. Give an interpretation of the parameters on child and ych0_2 - ych11_16. Compare them to the coefficients from the LPM.
+
+probit=glm(model_pc1, family=binomial(probit))
+summary(probit)
+
+#The coefficients in the probit model are merely informative about the sign and significance of the effect, not about the magnitude.  The model is non-linear and the parameters are not homogenous anymore, the effect depends on the starting point, i.e. the effect of one more child is different for women with no child and for women who have two children already (heterogeneous effects).  The coefficient alone is not the marginal effect.
+
+##9. Calculate the average conditional probability (c.p.) change in the probability of working (ATE) for the same two comparison groups as in question 6. Compare your results to the respective changes obtained from the LPM. Which results do you consider to be more credible?
+
+
+P(lfp=1|child=2,ych0_2=1,X)−P(lfp=1|child=1,ych0_2=1,X)
+m1<-mean(pnorm(cbind(1,1,1,ych3_4,ych5_10,ych11_16,age,I(age^2),educ_l,educ_h,married,nwinc)%*%probit$coef))
+m2<-mean(pnorm(cbind(1,2,1,ych3_4,ych5_10,ych11_16,age,I(age^2),educ_l,educ_h,married,nwinc)%*%probit$coef))
+m2-m1
+ 
+P(lfp=1|child=3,ych0_2=1,X)−P(lfp=1|child=2,ych0_2=1,X)
+m3<-mean(pnorm(cbind(1,3,1,ych3_4,ych5_10,ych11_16,age,I(age^2),educ_l,educ_h,married,nwinc)%*%probit$coef))
+m3-m2
+ 
+#The effects are not the same as those predicted with the LPM. They are not constant. The results of both models are similar, but the probit model could be considered as more credible.
+
