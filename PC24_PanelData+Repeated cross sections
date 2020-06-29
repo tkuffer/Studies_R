@@ -1,0 +1,158 @@
+rm(list=ls())
+Setting the working directory
+setwd("C:/freiburg/Econometric Methods and Applications I 2018/PC Labs")
+Libraries
+# install.packages('package name', repos='http://cran.us.r-project.org') #install package
+library(foreign) # Work with foreign data format
+library(lmtest) # OLS regression
+library(sandwich) # Standard errors robust to heteroskedasticity 
+library(plm) # Panel Data Econometrics
+library(clubSandwich) # Clustering
+
+Data
+data = read.dta( "pc_4.dta" )
+attach( data ) # load data into workspace
+
+dim( data )
+sum( is.na( data ) )
+summary( data )
+
+#3. Obtain descriptive statistics (mean value is sufficient) of the outcome variable (fte), the starting wage (wage_st), hours open per day (hrsopen), and the prices for a full meal (price) for each state and the years 1992 and 1993 separately. Comment on them shortly.
+round( aggregate( cbind( fte, wage_st, hrsopen,price ), list( year = year, state = state ), mean ), 2 )
+
+#4. Investigate the regional dummy variables. Are they well-defined (think about what this means for dummy variables)?
+
+round( rbind( mean( pa1[ state == 0 ] ), mean( pa2[ state == 0 ] ) ), 4 )
+sum( rbind( mean( pa1[ state == 0 ] ), mean( pa2[ state == 0 ] ) ) )
+round( rbind( mean( southj[ state == 1 ] ), mean( centralj[ state == 1 ] ), mean( northj[ state == 1 ] ) ), 4 )
+sum( rbind( mean( southj[ state == 1 ] ), mean( centralj[ state == 1 ] ), mean( northj[ state == 1 ] ) ) )
+
+##Estimation
+#5. Use the variation in the minimum wage over time in NJ to estimate its effect on employment. What is the impact of the $0.80 increase in the minimum wage? Run a simple regression and comment on the coefficient and its plausibility.
+ols1 = lm( fte[ state == 1 ] ~ minw[ state == 1 ] )
+coeftest( ols1, vcov = vcovHC )
+
+#The coefficient on minw:
+#•	suggests an employment increase by 0.56⋅0.8=0.448 employees (effect = coeff ⋅ change) in response to a $0.8 increase in minw.
+#•	is not statistically significantly different from zero. 
+#•	may be confounded with other economic or political changes over time that affect employment and minw.
+
+##6. Estimate a model that exploits the difference in minimum wage between NJ and PA in 1993. What is the employment effect of an increase in the minimum wage? Is using this state variation (New Jersey and Pennsylvania in 1993) a plausible way to obtain the causal impact? Why or why not?
+#This task compares a high min wage state with a low min wage state due to potential confounding induced by state specific characteristics.
+ols2 = lm( fte[ year == 93 ] ~ minw[ year == 93 ] )
+coeftest( ols2, vcov = vcovHC )
+
+#The coefficient on minw:
+#•	suggests a negative effect
+#•	is on average −1.14⋅0.8=−0.9 for a $0.80 increase in minw.
+#•	is not statistically significantly different from zero. 
+#•	is confounded by state specific characteristics that differ between NJ and PA 
+
+#9. Estimate the model from (8) using the appropriate method for panel data standard errors. Interpret your results with regard to the minimum wage effect on employment.
+#Variable types of the treatment dummy state (NJ versus PA) and the time dummy year (1993 versus 1992)
+class(state)
+class(year)
+
+#Regression formulation of DiD with categorized treatment and time dummies (state and year) and homoskedastic standard errors. Result suggests a positive effect of the minimum wage increase on employment, however the estimate is not significantly different from zero.
+did1 = lm( fte ~ factor( state ) * factor( year ) )
+summary( did1 )
+
+#Heteroskedasticity robust standard errors (not clustered)
+coeftest( did1, vcov=vcovHC )
+
+factor(state)1	-3.005700 	1.722387 	86.05558 	8.454096e-02
+factor(year)93	-1.642241 	1.500946 	57.00000 	2.784970e-01
+factor(state)1:factor(year)93	2.091221 	1.585046 	86.05558 	1.905537e-01
+
+#10. Can you think of reasons that the chain type, the regional dummies, or the ownership status might confound your analysis? If yes, explain why, add them to the model and estimate again. Comment on your results.
+#Regional variables, ownership status, or chain type might affect fte differently over time in both states.
+#•	Regional variables can confound the analysis: Violating the constant time trend assumption if potential fte in different regions of PA and NJ would change differently over time due to different economic conditions in the regions. Including those variables would account for these potential problems.
+#•	Chain type: A certain fast food chain may be more represented in PA than in NJ and react differently to economic or policy changes than another chain resulting in differential trends in fte over time - chain specific trend is a problem for constant time trend assumption if the share of chains differs by state (PA, NJ). However, the problem does not arise if the share is the same.
+
+did2 = lm( fte ~ factor( state ) * factor( year ) + factor( chain ) + co_owned + southj + centralj + pa1 )
+coeftest( did2, vcov = vcovHC )
+coef_test( obj = did2, vcov = "CR2", cluster = storeid )
+
+#•	Results: Additional controls do not change parameter of interest, thus, we can be confident that those variables do not influence the time trend of fte differently for both states.
+#•	In task (9) the chain-type and regional variables were in the error term, resulting in a risk for the validity of the constant time-trend assumption if those variables are correlated with treatment status d - controlling for them might solve this issue.
+#•	They can be significant (or not), but it does not matter if the policy coefficient does not change after including them - the results indicate no correlation between treatment and region or chain-type.
+#•	Region dummies (and chain type in our data) do not vary over time, thus it is useless to include them, and in addition they do not capture potential differences in economic conditions over time: gdp growth and state specific unemployment rates would be more appropriate.
+
+
+#11. Exploiting the panel structure of the data, use the fixed effects (FE) method to obtain the treatment effect of the minimum wage increase. Apply the within estimator. (Hint: Keep in mind the equivalence of the regression formulation of DiD and FE and do not include any additional covariates.)
+#What is the main underlying assumption in the FE method? Is this assumption plausible in this context? What are the drawbacks of the method?
+#Compare your result to the DiD treatment effect.
+fe1 = plm( fte ~ factor( state ) * factor( year ), 
+          index = c( "storeid", "year" ),data = data, model = c( "within" ) )
+summary( fe1 )
+
+#12. Estimate again a DiD and FE specification including the relevant dummies for treatment and the covariates that are assumed to be exogenous. What do you conclude about the minimum wage effect based on these two models and in comparison to question (11)?
+
+did3 = lm( fte ~ factor( state ) * factor( year ) + wage_st + hrsopen + price )
+coeftest( did3, vcov = vcovHC )
+coef_test( obj = did3, vcov = "CR2", cluster = storeid )
+
+#FE estimation
+fe2 = plm( fte ~ factor( state ) * factor( year ) + wage_st + hrsopen + price, 
+          index = c( "storeid", "year" ), data = data, model = c( "within" ) )
+summary( fe2 )
+
+#•	Results (different coefficients for 'policy') indicate that time varying variables influence the result such that FE and DiD are not the same anymore.
+#•	If exogenously assumed (not correlated with min wages) time varying variables have an influence on the outcome, then DiD and FE are not equivalent anymore.
+#•	However the estimation results are not that much different: both are not significant.
+
+#13. Now estimate the same model as in (12) with random effects (RE). How do your results for FE and RE differ with regard to the employment effect of a minimum wage change?
+#Random effects assume: E[ci|di]=E[ci]=0, i.e. treatment status (state) and unobserved individual fixed effect are uncorrelated.
+
+re = plm( fte ~ factor( state ) * factor( year ) + wage_st + hrsopen + price, 
+         index = c( "storeid" , "year" ), data = data, model = c( "random" ) )
+summary( re )
+coef_test( obj = re, vcov = "CR2", cluster = storeid )
+
+#•	Results: policy estimates of RE and FE (estimated in (12)) differ only slightly, however both stay insignificant.
+#•	Quote of Wooldridge: “Situation in which Cov(xi,t,j,ai)=0 should be considered the exception rather than the rule. If the key policy variable is set experimentally … then random effects would be appropriate for estimating the effect of the treatment. Unfortunately, in most cases the regressor themselves are outcomes of choice processes and likely to be correlated with individual preferences and abilities as captured by a_i”.
+
+#14. Perform a Hausman test to decide whether FE or RE is the appropriate model.
+phtest(fe2, re, vcov=vcovHC)
+
+#No rejection of the RE model, i.e. there is no problem with time constant confounders.However: 
+#•	FE is more robust because it is consistent also if unobserved time constant effects are present.
+#•	RE uses GLS (which takes the specific error structure into account) and is thus more efficient in small samples (i.e. smaller standard errors).
+
+
+rm( list = ls() )# remove previous data from memory
+load( "infantmortality.RData" ) # load data set
+
+ls()
+
+attach( data )
+
+
+#15. Provide descriptive statistics for the dataset on state infant mortatliy rates.
+
+dim( data )
+names( data )
+summary(data)
+
+hist( infmort ) # infant mortality
+ 
+hist( pcinc ) # per capita income
+ 
+hist( physic ) # number of physicians
+ 
+#16. Using the panel structure of the data, apply the fixed effects (FE) method to estimate the impact of per capita income on infant mortality. Exploit the variation in each US state obtained by considering the years 1987 and 1990. Assume that the number of physicians is exogenous and include it as a control variable in the model. Apply the within estimator and compute clustered standard errors.
+fe1 <- plm( infmort ~ pcinc + physic, index = c( "state", "year" ), data = data, model = c( "within" ) )
+coef_test( obj = fe1, vcov = "CR2", cluster = state )
+
+#17. Alternatively, generate dummy variables for the US states and run a pooled OLS regression. Compare the results to (16).
+ols2 = lm( infmort ~ pcinc + physic + factor( state ) )
+coef_test( obj = ols2, vcov = "CR2", cluster = state )
+
+#The coefficients obtained by the pooled OLS dummy variables regression are numerically equivalent to the fixed effects coefficients (see slide 22). 
+#Additionally, the pooled OLS dummy variables regression computes coefficients for the fixed states effects.
+
+#18. Now estimate an FD model using the same specification as in (16) and compare your results with those of the FE model.
+fd1 <- plm( infmort ~ pcinc + physic, index = c( "state", "year" ), data = data, model = c( "fd" ) )
+coef_test( obj = fd1, vcov = "CR2", cluster = state )
+
+#Equivalent findings as in (16) because the panel has two periods only, i.e. FE and FD estimations coincide if T=2 (see slide 29).
