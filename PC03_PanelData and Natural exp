@@ -1,0 +1,44 @@
+rm(list=ls())
+
+
+library(lmtest)
+library(AER)
+library(haven)
+library(plm)
+library(clubSandwich)
+library(sandwich)
+
+#load data set
+load("C:/Users/kuffe/OneDrive/Formation/UniFR/3.2_Applied Econometrics/R/Data/murder_2018_new.RData")
+attach(data)
+
+#1 OLS to estimate the effect of excutions over the pas 3 years on murders while controling for unemployment
+## 
+lm(formula = mrdrte ~ exec + unem)
+#There is no evidence of a deterrent effect because the estimated coefficient for executions is positive and not statistically significant. Unemployment tends to reflect socioeconomic deprivation and therefore (may) correlate with the number of murders. 
+
+#2. FD method to evaluate the effect of punishment on murders on unemployment
+## Assume homoscedasticity
+
+fd1 <- plm(mrdrte~exec+unem, index=c("state","year"), data=data, model=c("fd"))
+coeftest(fd1)
+
+#The effect of punishment is now negative but still insignificant. 
+
+#3. question 2 with heteroscedasticity-robust standard errors
+## Differences in the standard errors 
+
+coeftest(fd1, vcov=vcovHC)
+#Standard errors corrected for heteroscedasticity get smaller. Thus, the estimated deterrent effects become statistically significant at the 1% level
+
+#4. FE to evaluate the effect of punishment on murders conditional on unemployment
+## Report heteroscedasticity and cluster-robust SE, accounting for clustering on the state level
+## Compare your results to (3)
+
+fe1= plm(mrdrte~exec+unem, index=c("year","state"), data=data, model=c("within"))
+coef_test(fe1, vcov = vcovHC,  cluster = state)
+vcovCR(fe1, cluster = state)
+
+
+#Using the fixed effect method leads to a deterrent effect which is not statistically significant.
+
