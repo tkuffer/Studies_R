@@ -1,0 +1,39 @@
+library(haven)
+library(lmtest)
+library(sandwich)
+
+#load data set
+data=read_dta("C:/Users/kuffe/OneDrive/Formation/UniFR/3.2_Applied Econometrics/R/Data/CARD_2018.dta")
+
+#store variables in own objects
+attach(data)
+
+# OLS regression of log wage on years of education
+ols1= lm(lwage~educ)
+summary(ols1)
+
+#regression output with heteroskedasticity robust standard errors
+coeftest(ols1, vcov=vcovHC)
+
+
+# sample selection based on explanatory variable
+ols2= lm(lwage[female==0]~educ[female==0])
+coeftest(ols2, vcov=vcovHC)
+ols3= lm(lwage[female==1]~educ[female==1])
+coeftest(ols3, vcov=vcovHC)
+
+# generate an education-gender interaction and estimate in total sample
+educ_fem = educ*female
+ols4= lm(lwage~female+educ+educ_fem)
+coeftest(ols4, vcov=vcovHC)
+
+# sample selection based on dependent variable
+summary(ols1)
+ols5= lm(lwage[lwage < 2.5]~educ[lwage < 2.5])
+coeftest(ols5, vcov=vcovHC)
+
+# scatter plots
+plot(y=lwage, x=educ)
+lines(y=fitted.values(ols1),x=educ, col="red")
+plot(y=lwage[lwage < 2.5],x=educ[lwage < 2.5])
+lines(y=fitted.values(ols5),x=educ[lwage < 2.5], col="blue")
