@@ -1,0 +1,85 @@
+rm(list=ls())
+library(lmtest)
+library(haven)
+
+#load data set
+data=read_dta("C:\\Users\\HuberMar\\Dropbox\\Vorlesungen\\Applied Econometrics\\lecture\\lecture 1\\classize.dta")
+
+#store variables in own objects
+attach(data)
+
+# descriptive statistics of dependent variable tscorek (test score in kindergarten)
+summary(tscorek)
+# descriptive statistics of independent variable classize (class size in kindergarten)
+summary(classize)
+
+# histograms
+hist(tscorek)
+hist(classize)
+
+#scatter plot of y and x 
+plot(y=tscorek, x=classize)
+table(classize)
+
+#linear in class size
+ols1=lm(tscorek~classize)
+summary(ols1)
+
+# generate a variable defined as class size squared
+classize2 = classize^2
+
+# polynomial of order 2 in class size (non-linear)
+ols2=lm(tscorek~classize+classize2)
+summary(ols2)
+
+# generate a variable defined as class size^3
+classize3 = classize^3
+
+# polynomial of order 3 in class size (non-linear)
+ols3=lm(tscorek~classize+classize2+classize3)
+summary(ols3)
+
+# classify variable class size as factor to perform regression on dummies
+d.classize=factor(classize)
+
+# regression on dummies (completely flexible functional form: dummy for each level of classize)
+ols4=lm(tscorek~d.classize)
+summary(ols4)
+
+# generate an interaction between class size and gender
+clsizeboy = classize*boy
+
+# investigate effect heterogeneity w.r.t. boys
+ols5=lm(tscorek~classize+boy+clsizeboy)
+summary(ols5)
+
+# take a look at teacher's experience
+table(totexpk)
+hist(totexpk)
+summary(totexpk)
+
+# generate a dummy for more than 10 years of experience
+exphigh = totexpk > 10
+
+# generate an interaction term between class size and high experience
+clsizeexphigh = classize*exphigh
+
+# OLS regression allowing for effect heterogeneity for teacher experience > 10 years and <=10 years
+ols6=lm(tscorek~classize+exphigh+clsizeexphigh)
+summary(ols6)
+
+# ols7 equivalent to regression in two subsamples (standard error may differ though)
+ols7=lm(tscorek[exphigh == 0]~classize[exphigh == 0])
+summary(ols7)
+ols8=lm(tscorek[exphigh == 1]~classize[exphigh == 1])
+summary(ols8)
+
+#testing full model vs. model without experience dummy and interaction using F-test
+waldtest(ols6, ols1)
+
+#testing full model vs. model without experience dummy and interaction using F-test
+#with heteroskedasticity robust covariance matrix
+waldtest(ols6, ols1, vcov = vcovHC)
+
+
+
