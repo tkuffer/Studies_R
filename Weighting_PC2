@@ -1,0 +1,169 @@
+PC LAB 2
+Rcode
+library(boot)
+library(sandwich)
+library(lmtest)
+library(qte)
+library(foreign)
+library(multiwaycow)
+library(Matching)
+library(ipw)
+library(causalweight)
+
+
+data1 = read.dta("Ichino et al.dta")
+head(data1)
+
+####################
+#   Ex. 1          #
+####################
+attach(data1)
+formula1 <- (out3~treat)
+ols1 <- lm(formula1)
+summary(ols1)
+
+####################
+#   Ex. 2          #
+####################
+formula2 <- (out3~treat+age+male+single+italy+edu1+edu2+child)
+ols2 <- lm(formula2)
+summary(ols2)
+
+####################
+#   Ex. 3          #
+####################
+
+x <- cbind(age,male,single,italy,edu1,edu2,child)
+datax=data.frame(out3,treat,age,male,single,italy,edu1,edu2,child)
+bs = function(formula, data1, indices) {
+  dat=datax[indices,]
+  pscore=glm(formula=dat[,2]~dat[,3]+dat[,4]+dat[,5]+dat[,6]+dat[,7]+dat[,8]+dat[,9], data=datax, family=binomial(probit))$fitted
+  effect=Match(Y=dat[,1], Tr=dat[,2], X=pscore, estimand = "ATT", M = 1, BiasAdjust = TRUE, replace=TRUE)$est
+  return(effect)
+}
+muIPW1 <- (1/sum(treat)) * sum(treat*out3) - sum(  (1-treat)*out3*((pscore/(1-pscore))/sum((1-treat)*pscore/(1-pscore))))
+result <- boot(data=data.frame(out3,treat,x), statistic=bs, R=99, formula=treat~x, weights =muIPW1 )
+result
+
+#comparaison
+muIPW1
+summary(ols2)
+detach(data1)
+
+######################
+#   Ex. 4            #
+######################
+mod1= treat~age+male+single+italy+edu1+edu2+child
+pscore=glm(formula=mod1, data=data1, family=binomial(probit))$fitted
+
+#min and max propensity score amoung the treated
+c(min(pscore[treat==1]),max(pscore[treat==1]))
+#min and max propensity score amoung the non-treated
+c(min(pscore[treat==0]),max(pscore[treat==0]))
+
+#Histogram of propensity score
+hist(pscore)
+#Histogram of propensity score amoung the treated
+hist(pscore[treat==1])
+abline(v=mean(pscore[treat==1]), col="red",)
+#Histogram of propensity score amoung the non-treated
+hist(pscore[treat==0])
+abline(v=mean(pscore[treat==0]), col="red")
+help(abline)
+####################
+#   Ex. 5          #
+####################
+data2 <- cbind(data1,pscore) #Add pscore to data1
+data3 <- data2$pscore[which(data2$pscore<0.95)] # delete all the propensity score over 0.95
+
+data4 <- data2$pscore[data2$pscore<max(data2$pscore[which(treat==0)])]
+
+attach(data3)
+muIPW2 <- (1/sum(treat)) * sum(treat*out3) - sum(  (1-treat)*out3*((data3$`prop$pr_score`/(1-data3$`prop$pr_score`))/sum((1-treat)*data3$`prop$pr_score`/(1-data3$`prop$pr_score`))))
+detach(data3)
+attach(data4)
+muIPW3 <- (1/sum(treat)) * sum(treat*out3) - sum(  (1-treat)*out3*((data4$`prop$pr_score`/(1-data4$`prop$pr_score`))/sum((1-treat)*data4$`prop$pr_score`/(1-data4$`prop$pr_score`))))
+detach(data4)
+
+#comparaison
+muIPW1 # With all the data
+muIPW2 # With the propensity score > 0.95
+muIPW3 # With the propensity score > Max (PropScore|T=0)
+Exercise 1
+Run a simple OLS regression to estimate the treatment effect on the outcome "stable employment".
+Results
+
+Call:
+lm(formula = formula1)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-0.6244 -0.3008 -0.3008  0.3755  0.6992 
+
+Coefficients:
+            Estimate Std. Error t value Pr(>|t|)    
+(Intercept)  0.30079    0.01556  19.334   <2e-16 ***
+treat        0.32367    0.03441   9.408   <2e-16 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.4644 on 1118 degrees of freedom
+Multiple R-squared:  0.07335,	Adjusted R-squared:  0.07253 
+F-statistic:  88.5 on 1 and 1118 DF,  p-value: < 2.2e-16
+
+Exercise 2
+Add the following control variables to the OLS regression: age ("age"), gender ("male"), marital status ("single"), nationality ("italy"), education ("edu1, edu2") and having/not having children ("child"). Does the estimated treatment effect change once you control for the characteristics? What do you conclude about the treatment randomization with respect to personal characteristics?
+Results
+Call:
+lm(formula = formula2)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-0.7384 -0.3118 -0.1631  0.4303  0.9416 
+
+Coefficients:
+             Estimate Std. Error t value Pr(>|t|)    
+(Intercept)  0.240150   0.205998   1.166   0.2439    
+treat        0.282612   0.035727   7.910 6.17e-15 ***
+age          0.005982   0.002861   2.090   0.0368 *  
+male         0.162003   0.029990   5.402 8.06e-08 ***
+single      -0.060345   0.040607  -1.486   0.1375    
+italy       -0.228147   0.181893  -1.254   0.2100    
+edu1         0.132719   0.030264   4.385 1.27e-05 ***
+edu2         0.387224   0.046918   8.253 4.33e-16 ***
+child       -0.030868   0.021115  -1.462   0.1440    
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.4435 on 1111 degrees of freedom
+Multiple R-squared:  0.1602,	Adjusted R-squared:  0.1542 
+F-statistic:  26.5 on 8 and 1111 DF,  p-value: < 2.2e-16
+Answer
+The estimated treatment effect changes once we control for the characteristics.
+The personal characteristics are influencing the treatment effect, meaning that the control variables give more accurate precision on the estimated treatment effect. Also, the residual standard error does not inflate.
+Exercise 3
+Estimate the propensity score using a probit model and conduct IPW estimation of the ATET. Use the bootstrap (with replacement and 99 replications) to obtain the standard error and the p-value. Write your own code for the normalized IPW estimator of the ATET Δ^IPW according to the lecture notes (i.e. do not use R built-in functions to compute the ATET). Discuss differences between OLS and IPW and interpret your IPW results.
+Results
+WEIGHTED BOOTSTRAP
+
+
+Call:
+boot(data = data.frame(out3, treat, x), statistic = bs, R = 99, 
+    weights = muIPW1, formula = treat ~ x)
+
+
+Bootstrap Statistics :
+    original      bias    std. error  mean(t*)
+t1* 0.259598 0.004130824  0.05378231 0.2637289
+> 
+> #comparaison
+> muIPW1
+[1] 0.289362
+
+Discussion
+IPWl weights the results by the propensity to receive the treatment based on the covariates. In other words, an individual part of the control group with a high probability to receive the treatment will have more weight on the results. 
+OLS assume a constant treatment effect and a linear effect on the observable characteristic.
+The difference between the two is OLS does not take into account any matching so each individual is getting the same weight. In comparison, IPW will weigh with comparable results but the results are sensitive to propensity score. 
+Interpretation
+Being part of the treatment group will give here 0.25 percentage point more chance to, here, find a job than the non-treated. The standard error shows a deviation of 0.054 making it significative at 10%. The bias is small: less than 0.01. 
+p-value 
