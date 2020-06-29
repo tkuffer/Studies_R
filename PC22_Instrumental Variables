@@ -1,0 +1,84 @@
+rm(list=ls())
+
+Libraries
+# install.packages('package name', repos='http://cran.us.r-project.org') #install package
+library(foreign) # Work with foreign data format
+library(lmtest) # OLS regression
+library(sandwich) # Standard errors robust to heteroskedasticity 
+library(AER) # Applied Econometrics with R
+library(plyr) # Function ddply: Tools for splitting, applying and combining data
+library(corrplot) # Visualization of correlation matrices
+
+data_pc2 = read.dta("pc_2.dta")
+attach(data_pc2) 
+
+##Descriptive statistics
+#1. Show the distribution of wage and educ by means of a histogram. Does the data appear to be plausible?
+
+dim(data_pc2)
+	
+#Explore missing values
+sum(is.na(data_pc2)) # return the sum of missing observations in the dataset
+sum(is.na(educ))
+sum(is.na(wage))
+
+#Distribution of all variables
+summary(data_pc2) # missing values (NA's): 685 fatheduc and collfath, 351 motheduc and collmoth
+summary(wage)
+summary(educ)
+
+hist_educ=hist(educ,col="dimgray",main="Education")
+ ##Data seems reasonable.
+ 
+#2. Show the mean wage for each education level and comment shortly on this table.
+
+aggregate(wage,list(education=educ),mean)
+#Positive correlation between wage and education
+
+#Scatter plot
+plot(aggregate(wage,list(education=educ),mean))
+#Two-way scatter plot with a fitted line
+plot(educ,wage,xlab="education",ylab="wage")
+reg1=lm(wage~educ)
+abline(reg1)
+ 
+#3. What is the correlation between educ, fatheduc, motheduc, nearc2, and nearc4, as well as the correlation between college, nearc4, and collfath?
+
+a = cor(x=data_pc2[,c("educ","fatheduc","motheduc","nearc2","nearc4")], use="pairwise.complete.obs")
+corrplot(a,method = "number")
+ 
+b = cor(x=data_pc2[,c("college","nearc4","collfath")], use="pairwise.complete.obs")
+corrplot(b, method = "color")
+corrplot(b, method = "number")
+ 
+ 
+##Estimation
+##Part 1: Assume homogeneous effects
+#4. Estimate the returns to education by OLS for the model: lwage=β0+β1educ+u. What is the average effect of one more year of education on wages? Is it plausible that the estimated coefficient ˆβ1 describes a causal relationship of education on wages? Explain.
+
+ols1 = lm(lwage~educ)
+summary(ols1)
+Call:
+lm(formula = lwage ~ educ)
+
+#One more year of education is supposed to increase wages by about 5%. The coefficient is unlikely to describe a causal relationship between education and wages. Education cannot be seen as exogenous in this model because too many other factors that influence education and wages are omitted, in particular ability: Cov(D,U)≠0.
+
+##5. Discuss whether or not this instrument is plausibly valid.
+#Correlation between instrument and engogenous regressor: In general, father’s education can be correlated with the education of his children.  In this application, the correlation coefficient is 0.47, see task (3).
+#This assumption implies no direct effect of father’s education on the lwage of his children. The exclusion restriction may hold unless a father is directly responsible for the child’s wages.  However, it is also possible that a father has a high position in a firm and a wide network, thus he can influence the wage of his children.  We need to think to which extent the power of network can influence the children's wage.  If the impact isn't too high, the instrument father’s education can be valid.
+
+
+#6. Look at the correlation of educ and fatheduc and obtain the first stage estimates. Comment on the strength of the instrument. Now estimate the model using 2SLS. How would you explain the difference in the return to education compared to the OLS estimate given the instrument is valid?
+
+cor(educ[is.na(fatheduc)==0],fatheduc[is.na(fatheduc)==0])
+
+fs1 = lm(educ~fatheduc)
+summary(fs1) # 685 observations deleted due to missingness
+
+#The results suggest power of the instrument due to high correlation and a statistically significant coefficient in the first stage.
+
+
+##2SLS using the ivreg command
+iv1 = ivreg(lwage~educ|fatheduc)
+summary(iv1, vcov=vcovHC)
+
